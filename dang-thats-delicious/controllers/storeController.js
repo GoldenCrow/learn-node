@@ -8,10 +8,10 @@ const multerOptions = {
   storage: multer.memoryStorage(),
   fileFilter(req, file, next) {
     const isPhoto = file.mimetype.startsWith('image/');
-    if(isPhoto) {
+    if (isPhoto) {
       next(null, true);
     } else {
-      next({ message: `That filetype isn't allowed!`}, false);
+      next({ message: `That filetype isn't allowed!` }, false);
     }
   }
 };
@@ -51,7 +51,7 @@ exports.createStore = async (req, res) => {
   res.redirect(`/store/${store.slug}`);
 }
 
-exports.getStores = async (req, res) =>{
+exports.getStores = async (req, res) => {
   // 1. Query the database for a list of all stores
   const stores = await Store.find();
   res.render('stores', { title: 'Stores', stores });
@@ -87,7 +87,7 @@ exports.getStoreBySlug = async (req, res, next) => {
   const store = await Store
     .findOne({ slug: req.params.slug })
     .populate('author');
-  if(!store) return next();
+  if (!store) return next();
   res.render('store', { store, title: store.name });
 }
 
@@ -95,9 +95,28 @@ exports.getStoresByTag = async (req, res) => {
   const tag = req.params.tag
   const tagQuery = tag || { $exists: true };
 
-  const tagsPromise =  Store.getTagsList();
+  const tagsPromise = Store.getTagsList();
   const storesPromise = Store.find({ tags: tagQuery });
   const [tags, stores] = await Promise.all([tagsPromise, storesPromise])
 
   res.render('tag', { tags, title: 'Tags', tag, stores });
+}
+
+exports.searchStores = async (req, res) => {
+  const stores = await Store
+    // first find stores that match
+    .find({
+      $text: {
+        $search: req.query.q
+      }
+    }, {
+      score: { $meta: 'textScore' }
+    })
+    // then sort them
+    .sort({
+      score: { $meta: 'textScore' }
+    })
+    // limit to only 5 results
+    .limit(5);
+  res.json(stores);
 }
